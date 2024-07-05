@@ -38,6 +38,16 @@ If `run_install` is a YAML string representation of either an object or an array
 
 **Optional** (_type:_ `string[]`) Additional arguments after `pnpm [recursive] install`, e.g. `[--frozen-lockfile, --strict-peer-dependencies]`.
 
+### `package_json_file`
+
+**Optional** (_type:_ `string`, _default:_ `package.json`) File path to the `package.json` to read "packageManager" configuration.
+
+### `standalone`
+
+**Optional** (_type:_ `boolean`, _default:_ `false`) When set to true, [@pnpm/exe](https://www.npmjs.com/package/@pnpm/exe), which is a Node.js bundled package, will be installed, enabling using `pnpm` without Node.js.
+
+This is useful when you want to use a incompatible pair of Node.js and pnpm.
+
 ## Outputs
 
 ### `dest`
@@ -64,7 +74,7 @@ jobs:
     steps:
       - uses: pnpm/action-setup@v2
         with:
-          version: 6.0.2
+          version: 8
 ```
 
 ### Install pnpm and a few npm packages
@@ -83,7 +93,7 @@ jobs:
 
       - uses: pnpm/action-setup@v2
         with:
-          version: 6.0.2
+          version: 8
           run_install: |
             - recursive: true
               args: [--frozen-lockfile, --strict-peer-dependencies]
@@ -112,21 +122,19 @@ jobs:
 
       - uses: pnpm/action-setup@v2
         name: Install pnpm
-        id: pnpm-install
         with:
           version: 7
           run_install: false
 
       - name: Get pnpm store directory
-        id: pnpm-cache
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - uses: actions/cache@v3
         name: Setup pnpm cache
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-

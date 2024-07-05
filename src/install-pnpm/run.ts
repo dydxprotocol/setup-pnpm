@@ -6,7 +6,7 @@ import { execPath } from 'process'
 import { Inputs } from '../inputs'
 
 export async function runSelfInstaller(inputs: Inputs): Promise<number> {
-  const { version, dest } = inputs
+  const { version, dest, packageJsonFile, standalone } = inputs
 
   // prepare self install
   await remove(dest)
@@ -15,7 +15,7 @@ export async function runSelfInstaller(inputs: Inputs): Promise<number> {
   await writeFile(pkgJson, JSON.stringify({ private: true }))
 
   // prepare target pnpm
-  const target = await readTarget(version)
+  const target = await readTarget({ version, packageJsonFile, standalone })
   const cp = spawn(execPath, [path.join(__dirname, 'pnpm.js'), 'install', target, '--no-lockfile'], {
     cwd: dest,
     stdio: ['pipe', 'inherit', 'inherit'],
@@ -33,8 +33,14 @@ export async function runSelfInstaller(inputs: Inputs): Promise<number> {
   return exitCode
 }
 
-async function readTarget(version?: string | undefined) {
-  if (version) return `pnpm@${version}`
+async function readTarget(opts: {
+  readonly version?: string | undefined
+  readonly packageJsonFile: string
+  readonly standalone: boolean
+}) {
+  const { version, packageJsonFile, standalone } = opts
+
+  if (version) return `${ standalone ? '@pnpm/exe' : 'pnpm' }@${version}`
 
   const { GITHUB_WORKSPACE } = process.env
   if (!GITHUB_WORKSPACE) {
@@ -44,17 +50,22 @@ please run the actions/checkout before pnpm/action-setup.
 Otherwise, please specify the pnpm version in the action configuration.`)
   }
 
-  const { packageManager } = JSON.parse(await readFile(path.join(GITHUB_WORKSPACE, 'package.json'), 'utf8'))
+  const { packageManager } = JSON.parse(await readFile(path.join(GITHUB_WORKSPACE, packageJsonFile), 'utf8'))
   if (typeof packageManager !== 'string') {
     throw new Error(`No pnpm version is specified.
 Please specify it by one of the following ways:
   - in the GitHub Action config with the key "version"
-  - in the package.json with the key "packageManager" (See https://nodejs.org/api/corepack.html)`)
+  - in the package.json with the key "packageManager"`)
   }
 
   if (!packageManager.startsWith('pnpm@')) {
     throw new Error('Invalid packageManager field in package.json')
   }
+
+  if(standalone){
+    return packageManager.replace('pnpm@', '@pnpm/exe@')
+  }
+
   return packageManager
 }
 
